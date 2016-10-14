@@ -2301,6 +2301,17 @@ own.@footnote{If you enjoy a particular streaming audio station on the
 Web and think that it belongs in the default list, please send us a
 link and we will gladly add it!}
 
+@defopt *emms-stream-info-backend*
+Set `*emms-stream-info-backend*' to either 'vlc or 'mplayer, which are
+the two currently supported backends for retrieving stream information.
+You can then either call `emms-stream-info-message' directly or hit @kbd{i}
+in the `emms-streams' buffer over stream you want to investigate.
+
+Note that you do not have to be playing the stream in question in order
+to find out what is playing on it since this library will open its own
+connection to the streaming server.
+@end defopt
+
 The following is a list of the key-bindings for the emms-streams
 interface:
 
