@@ -61,7 +61,9 @@
   "Backend command for running mplayer on URL."
   (condition-case excep
       (call-process "mplayer" nil t nil
-		    "-nocache" "-endpos" "0" "-vo" "null" "-ao" "null"
+		    "-cache" "256"
+		    "-endpos" "0" "-vo" "null" "-ao" "null"
+		    "-msglevel" "all=-1:network=4:demuxer=4"
 		    url)
     (file-error
      (error "Could not find the mplayer backend binary"))))
