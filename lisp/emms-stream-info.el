@@ -57,13 +57,14 @@
 		(> (length (match-string-no-properties 1)) 0))
        (setq ,symname (match-string-no-properties 1)))))
 
-(defun emms-stream-info-mplayer-backend (url)
+(defun emms-stream-info-mplayer-backend (url type)
   "Backend command for running mplayer on URL."
   (condition-case excep
       (call-process "mplayer" nil t nil
 		    "-cache" "256"
 		    "-endpos" "0" "-vo" "null" "-ao" "null"
 		    "-msglevel" "all=-1:network=4:demuxer=4"
+		    (if (eq type 'streamlist) "-playlist" "")
 		    url)
     (file-error
      (error "Could not find the mplayer backend binary"))))
@@ -77,7 +78,7 @@
     (file-error
      (error "Could not find the VLC backend binary"))))
 
-(defun emms-stream-info-call-backend (url)
+(defun emms-stream-info-call-backend (url type)
   "Call backend and return a list of stream information for URL."
   (let ((name "N/A")
 	(genre "N/A")
@@ -87,7 +88,7 @@
       (message "querying stream...")
       (cond
        ((eq *emms-stream-info-backend* 'mplayer)
-	(emms-stream-info-mplayer-backend url)
+	(emms-stream-info-mplayer-backend url type)
 	(emms-stream-info-defreg name "^Name[ ]+:[ ]+\\(.*\\)$")
 	(emms-stream-info-defreg genre "^Genre[ ]+:[ ]+\\(.*\\)$")
 	(emms-stream-info-defreg bitrate "^Bitrate[ ]+:[ ]+\\(.*\\)$")
@@ -103,10 +104,10 @@
     (list name genre bitrate nowplaying)))
 
 ;; point of entry
-(defun emms-stream-info-message (url)
+(defun emms-stream-info-message (url type)
   "Display a message with information about the stream at URL."
   (interactive "Murl: ")
-  (let* ((stream-info (emms-stream-info-call-backend url))
+  (let* ((stream-info (emms-stream-info-call-backend url type))
 	 (name (nth 0 stream-info))
 	 (genre (nth 1 stream-info))
 	 (bitrate (nth 2 stream-info))

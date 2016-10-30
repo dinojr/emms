@@ -478,8 +478,9 @@ Don't forget to save your modifications !"
   (interactive)
   (if (fboundp 'emms-stream-info-message)
       (let* ((line (get-text-property (point) 'emms-stream))
-	     (url (emms-stream-url line)))
-	(emms-stream-info-message url))
+	     (url (emms-stream-url line))
+	     (type (emms-stream-type line)))
+	(emms-stream-info-message url type))
     (message "Streaming media info not available.")))
 
 ;; Killing and yanking
