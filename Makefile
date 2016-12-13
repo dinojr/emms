@@ -11,6 +11,7 @@ DESTDIR=
 PREFIX=$(DESTDIR)/usr/local
 INFODIR=$(PREFIX)/info
 MAN1DIR=$(PREFIX)/share/man/man1
+BINDIR=$(PREFIX)/bin
 SITELISP=$(PREFIX)/share/emacs/site-lisp/emms
 
 GINSTALLINFO = /usr/bin/ginstall-info --info-dir=$(INFODIR)
@@ -19,7 +20,7 @@ INSTALLINFO = /usr/bin/install-info --info-dir=$(INFODIR)
 CHANGELOG_CMD = git log --pretty=medium --no-merges
 
 # The currently released version of EMMS
-VERSION=4.1
+VERSION=4.2
 
 .PHONY: all install lisp docs deb-install clean
 .PRECIOUS: %.elc
@@ -48,6 +49,12 @@ install:
 		$(GINSTALLINFO) $(DOCDIR)emms.info; \
 	else \
 		$(INSTALLINFO) $(DOCDIR)emms.info; \
+	fi
+	if [ -x  $(SRCDIR)/emms-print-metadata ]; then \
+		echo "emms-print-metadata found, installing"; \
+		install -m 755 $(SRCDIR)/emms-print-metadata $(BINDIR)/emms-print-metadata; \
+	else \
+		echo "skipping emms-print-metadata install"; \
 	fi
 
 remove-info:
