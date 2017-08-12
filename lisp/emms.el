@@ -5,6 +5,7 @@
 
 ;; Author: Jorgen Schäfer <forcer@forcix.cx>
 ;; Keywords: emms, mp3, mpeg, multimedia
+;; Package-Requires: ((cl-lib "0.5"))
 
 ;; This file is part of EMMS.
 
@@ -40,7 +41,7 @@
 
 ;;; Code:
 
-(defvar emms-version "4.2"
+(defvar emms-version "4.3"
   "EMMS version string.")
 
 
