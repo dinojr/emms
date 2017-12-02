@@ -509,6 +509,7 @@ Called once for each directory."
 ;; General mode setup
 ;; --------------------------------------------------
 
+;;;###autoload
 (defun emms-browser ()
   "Launch or switch to the EMMS Browser."
   (interactive)
@@ -811,7 +812,7 @@ return an empty string."
 (defun emms-browser-year-number (track)
   "Return a string representation of a track's year.
 This will be in the form '(1998) '."
-  (let ((year (emms-track-get track 'info-year)))
+  (let ((year (emms-track-get-year track)))
     (if (or (not (stringp year)) (string= year "0"))
         ""
       (concat
@@ -1399,6 +1400,7 @@ Disabled by default."
   :group 'emms-browser
   :type 'boolean)
 
+;;;###autoload
 (defun emms-smart-browse ()
   "Display browser and playlist.
 Toggle between selecting browser, playlist or hiding both. Tries
@@ -1717,7 +1719,7 @@ If > album level, most of the track data will not make sense."
          (format-choices
           `(("i" . ,indent)
             ("n" . ,name)
-            ("y" . ,(emms-track-get track 'info-year))
+            ("y" . ,(emms-track-get-year track))
             ("A" . ,(emms-track-get track 'info-album))
             ("a" . ,(emms-track-get track 'info-artist))
             ("C" . ,(emms-track-get track 'info-composer))
