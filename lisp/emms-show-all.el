@@ -41,10 +41,6 @@
 (defvar emms-show-all-track-alist nil
   "Declare so as to silence the compiler.")
 
-(define-derived-mode emms-show-all-mode text-mode "Emms-Show-All"
-  "Major mode for `emms-show-all'
-  \\{emms-show-all-mode-map}")
-
 (defvar emms-show-all-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map text-mode-map)
@@ -53,6 +49,9 @@
     map)
   "Keymap for `emms-show-all-mode'.")
 
+(define-derived-mode emms-show-all-mode text-mode "Emms-Show-All"
+  "Major mode for `emms-show-all'
+  \\{emms-show-all-mode-map}")
 
 (defun emms-show-all-edit-track ()
   "Edit the track being shown."
@@ -64,10 +63,9 @@
 (defun emms-show-all-mode-bury-buffer ()
   "Bury, and optionally kill the show buffer."
   (interactive)
-  (bury-buffer emms-show-all-buffer-name)
-  (delete-window)
-  (when emms-show-all-kill-buffer-on-quit-p
-    (kill-buffer emms-show-all-buffer-name)))
+  (quit-restore-window
+   (selected-window)
+   (when emms-show-all-kill-buffer-on-quit-p 'kill)))
 
 (defun emms-show-all-setup-buffer ()
   "Prepare the display buffer."

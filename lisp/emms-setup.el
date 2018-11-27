@@ -1,6 +1,6 @@
 ;;; emms-setup.el --- Setup script for EMMS
 
-;; Copyright (C) 2005, 2006, 2007, 2008, 2009, 2015 Free Software
+;; Copyright (C) 2005, 2006, 2007, 2008, 2009, 2015, 2018 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Yoni Rabkin <yrk@gnu.org>
@@ -52,6 +52,7 @@
     emms-player-ogg123
     emms-player-mplayer-playlist
     emms-player-mplayer
+    emms-player-mpv
     emms-player-vlc
     emms-player-vlc-playlist)
   "*Default list of players for emms-setup."
@@ -66,6 +67,7 @@ Invisible playlists and all the basics for playing media."
   (require 'emms-source-playlist)
   (require 'emms-player-simple)
   (require 'emms-player-mplayer)
+  (require 'emms-player-mpv)
   (require 'emms-player-vlc))
 
 ;;;###autoload
@@ -81,6 +83,7 @@ the stable features which come with the Emms distribution."
     (require 'emms-info)
     (require 'emms-info-mp3info)
     (require 'emms-info-ogginfo)
+    (require 'emms-info-opusinfo)
     (require 'emms-cache)
     (require 'emms-mode-line)
     (require 'emms-mark)
@@ -113,8 +116,10 @@ the stable features which come with the Emms distribution."
     (add-to-list 'emms-info-functions 'emms-info-mp3info))
   (when (executable-find emms-info-ogginfo-program-name)
     (add-to-list 'emms-info-functions 'emms-info-ogginfo))
+  (when (executable-find emms-info-opusinfo-program-name)
+    (add-to-list 'emms-info-functions 'emms-info-opusinfo))
   (setq emms-track-description-function 'emms-info-track-description)
-  (when (fboundp 'emms-cache)           ; work around compiler warning
+  (when (fboundp 'emms-cache)		; work around compiler warning
     (emms-cache 1))
   (emms-mode-line 1)
   (emms-mode-line-blank)
@@ -122,8 +127,7 @@ the stable features which come with the Emms distribution."
   (emms-playing-time 1)
   (add-to-list 'emms-info-functions 'emms-info-cueinfo)
   (add-hook 'emms-player-started-hook 'emms-last-played-update-current)
-  (emms-score 1)
-  (emms-playlist-limit 1))
+  (emms-score 1))
 
 
 ;;;###autoload

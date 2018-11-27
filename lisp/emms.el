@@ -1,7 +1,7 @@
 ;;; emms.el --- The Emacs Multimedia System
 
 ;; Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008,
-;;   2009 Free Software Foundation, Inc.
+;;   2009, 2018 Free Software Foundation, Inc.
 
 ;; Author: Jorgen Schäfer <forcer@forcix.cx>
 ;; Keywords: emms, mp3, mpeg, multimedia
@@ -42,7 +42,7 @@
 
 ;;; Code:
 
-(defvar emms-version "4.4"
+(defvar emms-version "5.1"
   "EMMS version string.")
 
 
@@ -94,6 +94,9 @@ are played sequentially."
 track by track normally."
   :group 'emms
   :type 'boolean)
+
+(defvar-local emms-single-track nil
+  "Non-nil, play the current track and then stop.")
 
 (defcustom emms-completing-read-function
   (if (and (boundp 'ido-mode)
@@ -149,7 +152,7 @@ sorts before the second (see `sort')."
   :type 'string
   :group 'emms)
 
-(defcustom emms-playlist-default-major-mode major-mode
+(defcustom emms-playlist-default-major-mode 'emms-playlist-mode
   "*The default major mode for EMMS playlist."
   :type 'function
   :group 'emms)
@@ -173,6 +176,11 @@ shouldn't assume that the track has been inserted before."
   :group 'emms
   :type 'function)
 (make-variable-buffer-local 'emms-playlist-delete-track-function)
+
+(defcustom emms-ok-track-function 'emms-default-ok-track-function
+  "*Function returns true if we shouldn't skip this track."
+  :group 'emms
+  :type 'function)
 
 (defcustom emms-playlist-source-inserted-hook nil
   "*Hook run when a source got inserted into the playlist.
@@ -403,12 +411,18 @@ This is a good function to put in `emms-player-next-function'."
     (error "A track is already being played"))
   (cond (emms-repeat-track
 	 (emms-start))
+	(emms-single-track		; buffer local
+	 (emms-stop))
+	;; attempt to play the next track but ignore errors
 	((condition-case nil
              (progn
                (emms-playlist-current-select-next)
                t)
            (error nil))
-	 (emms-start))
+	 (if (funcall emms-ok-track-function
+		      (emms-playlist-current-selected-track))
+	     (emms-start)
+	   (emms-next-noerror)))
         (t
 	 (message "No next track in playlist"))))
 
@@ -502,6 +516,18 @@ This uses `emms-playlist-uniq-function'."
     (save-excursion
       (funcall emms-playlist-uniq-function))))
 
+(defun emms-toggle-single-track ()
+  "Toggle if Emms plays a single track and stops."
+  (interactive)
+  (with-current-emms-playlist
+    (cond (emms-single-track
+	   (setq emms-single-track nil)
+	   (message "single track mode disabled for %s"
+		    (buffer-name)))
+	  (t (setq emms-single-track t)
+	     (message "single track mode enabled for %s"
+		    (buffer-name))))))
+
 (defun emms-toggle-random-playlist ()
   "Toggle whether emms plays the tracks randomly or sequentially.
 See `emms-random-playlist'."
@@ -551,10 +577,13 @@ See `completing-read' for a description of ARGS."
 (defun emms-display-modes ()
   "Display the current EMMS play modes."
   (interactive)
-  (message "repeat playlist: %s, repeat track: %s, random: %s"
-	   (if emms-repeat-playlist "yes" "no")
-	   (if emms-repeat-track "yes" "no")
-	   (if emms-random-playlist "yes" "no")))
+  (with-current-emms-playlist
+    (message
+     "repeat playlist: %s, repeat track: %s, random: %s, single %s"
+     (if emms-repeat-playlist "yes" "no")
+     (if emms-repeat-track "yes" "no")
+     (if emms-random-playlist "yes" "no")
+     (if emms-single-track "yes" "no"))))
 
 
 ;;; Compatibility functions
@@ -1227,6 +1256,10 @@ ignore this."
       (if pos
           (emms-playlist-select pos)
         (emms-playlist-first)))))
+
+(defun emms-default-ok-track-function (track)
+  "A function which OKs all tracks for playing by default."
+  t)
 
 ;;; Helper functions
 (defun emms-property-region (pos prop)

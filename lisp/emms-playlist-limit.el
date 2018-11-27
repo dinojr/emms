@@ -1,8 +1,9 @@
-;;; emms-playlist-limit.el --- Limit playlist by various info
+;;; emms-playlist-limit.el --- Limit playlist by various info -*- lexical-binding: t -*-
 
-;; Copyright (C) 2007, 2008, 2009 William Xu
+;; Copyright (C) 2018 Free Software Foundation, Inc.
 
 ;; Author: William Xu <william.xwl@gmail.com>
+;; Author: Fran Burstall <fran.burstall@gmail.com>
 ;; Keywords: emms, limit
 
 ;; EMMS is free software; you can redistribute it and/or modify
@@ -20,78 +21,87 @@
 ;; Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
 ;; Boston, MA 02110-1301, USA.
 
+;;; Commentary:
+
+;;  This code allows you to "limit" a playlist in the current buffer
+;;  by creating, and switching to, a derived playlist containing only
+;;  those tracks with a type (info-artist and the like) matching a
+;;  regexp.
+
+;;  If the current buffer is the current playlist then the derived
+;;  playlist is made current.
+
+;;  Usage:
+;;  ------------------------------------------------------------------
+
+;;  This code is activated by (emms-all).  Otherwise simply do:
+
+;;  (require 'emms-playlist-limit)
+
+;;  Key bindings
+;;  ------------------------------------------------------------------
+
+;; / /		emms-playlist-limit-to-all
+;; / a		emms-playlist-limit-to-info-artist
+;; / b		emms-playlist-limit-to-info-album
+;; / c		emms-playlist-limit-to-info-composer
+;; / d		emms-playlist-limit-to-description
+;; / g		emms-playlist-limit-to-info-genre
+;; / n		emms-playlist-limit-to-name
+;; / p		emms-playlist-limit-to-info-performer
+;; / t		emms-playlist-limit-to-info-title
+;; / y		emms-playlist-limit-to-info-year
+
 ;;; Code:
 
+(require 'seq)
 (require 'emms-playlist-mode)
 
-;;; User Interfaces
+;; User Interfaces
 
 (defgroup emms-playlist-limit nil
   "Playlist limit module for EMMS."
   :group 'emms)
 
 (defcustom emms-playlist-limit-hook nil
-  "Hooks to run after each limit operations."
+  "Hooks to run after each limit operation."
   :type 'symbol
-  :group 'emms-playing-limit)
-
-(defvar emms-playlist-limit-enabled-p nil
-  "If non-nil, emms playlist limit is enabled.")
-
-(defun emms-playlist-limit (arg)
-  "Turn on emms playlist limit if ARG is positive, off otherwise."
-  (interactive "p")
-  (if (and arg (> arg 0))
-      (progn
-        (setq emms-playlist-limit-enabled-p t)
-        (add-hook 'emms-playlist-source-inserted-hook
-                  'emms-playlist-limit-insert))
-    (setq emms-playlist-limit-enabled-p nil)
-    (remove-hook 'emms-playlist-source-inserted-hook
-                 'emms-playlist-limit-insert)))
-
-;;;###autoload
-(defun emms-playlist-limit-enable ()
-  "Turn on emms playlist limit."
-  (interactive)
-  (emms-playlist-limit 1)
-  (message "emms playlist limit enabled"))
-
-;;;###autoload
-(defun emms-playlist-limit-disable ()
-  "Turn off emms playlist limit."
-  (interactive)
-  (emms-playlist-limit -1)
-  (message "emms playlist limit disabled"))
-
-;;;###autoload
-(defun emms-playlist-limit-toggle ()
-  "Toggle emms playlist limit."
-  (interactive)
-  (if emms-playlist-limit-enabled-p
-      (emms-playlist-limit-disable)
-    (emms-playlist-limit-enable)))
+  :group 'emms-playlist-limit)
 
 (defmacro define-emms-playlist-limit (attribute)
-  "Macro for defining emms playlist limit functions."
+  "Macro for defining emms playlist limit to ATTRIBUTE function."
   `(defun ,(intern (format "emms-playlist-limit-to-%s" attribute)) (regexp)
-     ,(format "Limit to playlists that have %s that matches REGEXP." attribute)
+     ,(format "Switch to a playlist comprising tracks with %s matching REGEXP.
+
+REGEXP defaults to the value of %s for the track at point.
+
+When the current buffer is the current playlist, make the derived playlist
+the current playlist." attribute attribute)
      (interactive
       (list
        (let* ((curr
-               (or (emms-track-get
-                    (emms-playlist-track-at) (quote ,attribute))
-                   (emms-track-get
-                    (emms-playlist-selected-track) (quote ,attribute))))
-              (attr-name ,(emms-replace-regexp-in-string
-                           "info-" "" (symbol-name attribute)))
-              (fmt (if curr
-                       (format "Limit to %s (regexp = %s): " attr-name curr)
-                     (format "Limit to %s (regexp): " attr-name))))
-         (read-string fmt))))
+	       (or (emms-playlist-limit-track-get
+		    (or (emms-playlist-track-at)
+			(emms-playlist-track-at (max 1 (1- (point))))) ; at eol
+		    (quote ,attribute))
+		   (emms-playlist-limit-track-get
+		    (emms-playlist-selected-track) (quote ,attribute))))
+	      (attr-name ,(emms-replace-regexp-in-string
+			   "info-" "" (symbol-name attribute)))
+	      (fmt (if curr
+		       (format "Limit to %s (regexp = %s): " attr-name curr)
+		     (format "Limit to %s (regexp): " attr-name))))
+	 (read-string fmt))))
      (when (string= regexp "")
-       (setq regexp (emms-track-get (emms-playlist-track-at) (quote ,attribute))))
-     (emms-playlist-limit-do (quote ,attribute) regexp)))
+       (setq regexp (or (emms-playlist-limit-track-get
+			 (or (emms-playlist-track-at)
+			     (emms-playlist-track-at (max 1 (1- (point))))) ; at eol
+			 (quote ,attribute))
+			(emms-playlist-limit-track-get
+			 (emms-playlist-selected-track) (quote ,attribute)))))
+     (if regexp
+	 (emms-playlist-limit-do (quote ,attribute) regexp)
+       (message "Limit cancelled: no regexp."))))
 
 (define-emms-playlist-limit info-artist)
 (define-emms-playlist-limit info-composer)
@@ -101,11 +111,25 @@
 (define-emms-playlist-limit info-year)
 (define-emms-playlist-limit info-genre)
 (define-emms-playlist-limit name)
+(define-emms-playlist-limit description)
+
+(defvar-local emms-playlist-limit--original-playlist nil
+  "Playlist buffer from which we derive the limited playlist.")
 
 (defun emms-playlist-limit-to-all ()
-  "Show all tracks again."
+  "Switch to playlist from which this playlist was derived (if it still exists)
+and bury this playlist.
+
+If this playlist is current, make the playlist we switch to current."
   (interactive)
-  (emms-playlist-limit-do nil nil))
+  (when (and emms-playlist-limit--original-playlist
+	     (buffer-live-p emms-playlist-limit--original-playlist))
+    (let* ((old-buf (current-buffer))
+	   (old-buf-is-current-playlist (eq old-buf emms-playlist-buffer)))
+      (switch-to-buffer emms-playlist-limit--original-playlist)
+      (when old-buf-is-current-playlist
+	(emms-playlist-set-playlist-buffer))
+      (bury-buffer old-buf))))
 
 (define-key emms-playlist-mode-map (kbd "/ n") 'emms-playlist-limit-to-name)
 (define-key emms-playlist-mode-map (kbd "/ a") 'emms-playlist-limit-to-info-artist)
@@ -115,61 +139,84 @@
 (define-key emms-playlist-mode-map (kbd "/ b") 'emms-playlist-limit-to-info-album)
 (define-key emms-playlist-mode-map (kbd "/ y") 'emms-playlist-limit-to-info-year)
 (define-key emms-playlist-mode-map (kbd "/ g") 'emms-playlist-limit-to-info-genre)
+(define-key emms-playlist-mode-map (kbd "/ d") 'emms-playlist-limit-to-description)
 (define-key emms-playlist-mode-map (kbd "/ /") 'emms-playlist-limit-to-all)
 
 
 ;;; Low Level Functions
 
-(defvar emms-playlist-limit-tracks nil
-  "All tracks in playlist buffer(unlimited).")
+(defun emms-playlist-limit-track-get (track type)
+  "Return the value of TYPE from TRACK.
 
-(defun emms-playlist-limit-insert ()
-  "Run in `emms-playlist-source-inserted-hook'."
-  (with-current-emms-playlist
-    (emms-playlist-ensure-playlist-buffer)
-    (setq emms-playlist-limit-tracks
-          (emms-with-widened-buffer
-           (emms-playlist-tracks-in-region (point-min) (point-max))))))
+Here TYPE is a field available to `emms-track-get' or
+'description which gives the result of
+`emms-track-description-function'.
 
-;; FIXME: When user deletes some tracks, `emms-playlist-limit-tracks'
-;; should be updated.
-;; (defun emms-playlist-limit-clear ()
-;;   "Run in `emms-playlist-cleared-hook'."
-;;   (setq emms-playlist-limit-tracks
-;;         (append emms-playlist-limit-tracks
-;;                 (emms-playlist-tracks-in-region
-;;                  (point-min) (point-max)))))
+When type is 'info-year, also tries 'info-originalyear,
+ 'info-originaldate and 'info-date to get a usable date."
+  (cond ((eq type 'info-year)
+	 (let ((date (or (emms-track-get track 'info-originaldate)
+			 (emms-track-get track 'info-originalyear)
+			 (emms-track-get track 'info-date)
+			 (emms-track-get track 'info-year))))
+	   (or  (emms-format-date-to-year date)
+		"<unknown year>")))
+	((eq type 'description) (funcall emms-track-description-function track))
+	(t (emms-track-get track type))))
 
-(defun emms-playlist-limit-do (name value)
-  "Limit by NAME with VALUE.
+(defun emms-playlist-limit--derive-playlist (playlist pred name)
+  "Return a new playlist NAME of tracks in PLAYLIST for which (PRED track)
+is non-nil."
+  (let* ((tracks (nreverse (with-current-buffer playlist
+			     (save-excursion (emms-playlist-tracks-in-region (point-min) (point-max))))))
+	 (filtered-tracks (seq-filter pred tracks))
+	 (new-playlist (or (get-buffer name)
+			   (emms-playlist-new name))))
+    (with-current-buffer new-playlist
+      (emms-with-inhibit-read-only-t (erase-buffer))
+      (mapc #'emms-playlist-insert-track filtered-tracks))
+    new-playlist))
+
+(defun emms-playlist-limit--limit-playlist (playlist type regexp)
+  "Return a new playlist of tracks in PLAYLIST with TYPE matching REGEXP."
+  (let* ((bufname (concat (buffer-name playlist)
+			  (format "/%s=%s"
+				  (emms-replace-regexp-in-string "info-" "" (symbol-name type)) regexp))))
+    (emms-playlist-limit--derive-playlist
+     playlist
+     `(lambda (track) (let ((field (emms-playlist-limit-track-get track (quote ,type))))
+		       (and field (string-match ,regexp field))))
+     bufname)))
+
+
+
+(defun emms-playlist-limit-do (type regexp)
+  "Switch to a derived playlist containing the tracks with TYPE matching REGEXP.
 e.g.,
     (emms-playlist-limit-do 'info-artist \"Jane Zhang\")
 
-When NAME is nil, show all tracks again.
-
-See `emms-info-mp3find-arguments' for possible options for NAME."
-  (with-current-emms-playlist
-    (emms-playlist-ensure-playlist-buffer)
-    (let ((curr (emms-playlist-current-selected-track))
-          (tracks (emms-playlist-tracks-in-region (point-min) (point-max))))
-      (erase-buffer)
-      (run-hooks 'emms-playlist-cleared-hook)
-      (if name
-          (mapc (lambda (track)
-                  (let ((track-value (emms-track-get track name)))
-                    (when (and track-value (string-match value track-value))
-                      (emms-playlist-insert-track track))))
-                tracks)
-        (mapc (lambda (track)
-                (emms-playlist-insert-track track))
-              emms-playlist-limit-tracks))
-      (let ((pos (text-property-any (point-min) (point-max)
-                                    'emms-track curr)))
-        (if pos
-            (emms-playlist-select pos)
-          (emms-playlist-first)))
-      (run-hooks 'emms-playlist-limit-hook)
-      (emms-playlist-mode-center-current))))
+See `emms-info-mp3find-arguments' for possible options for TYPE."
+  (emms-playlist-ensure-playlist-buffer)
+  (let* ((curr (emms-playlist-selected-track))
+	 (old-buf (current-buffer))
+	 (old-buf-is-current-playlist (eq old-buf emms-playlist-buffer))
+	 (buf (emms-playlist-limit--limit-playlist old-buf type regexp)))
+    (with-current-buffer buf
+      (if (= (point-min) (point-max))
+	  (progn
+	    (message "No matching tracks found!")
+	    (kill-buffer))
+	(let ((pos (when curr (text-property-any (point-min) (point-max)
+						 'emms-track curr))))
+	  (if pos
+	      (emms-playlist-select pos)
+	    (emms-playlist-select-first)))
+	(emms-playlist-mode-center-current)
+	(setq emms-playlist-limit--original-playlist old-buf)
+	(when old-buf-is-current-playlist
+	  (emms-playlist-set-playlist-buffer))
+	(run-hooks 'emms-playlist-limit-hook)
+	(switch-to-buffer buf)))))
 
 
 (provide 'emms-playlist-limit)

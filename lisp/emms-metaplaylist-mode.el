@@ -1,6 +1,6 @@
 ;;; emms-metaplaylist-mode.el --- A major mode for lists of Emms playlists
 
-;; Copyright (C) 2006, 2007, 2008, 2009, 2017 Free Software Foundation, Inc.
+;; Copyright (C) 2006, 2007, 2008, 2009, 2017-2018 Free Software Foundation, Inc.
 
 ;; Author: Yoni Rabkin <yrk@gnu.org>
 
@@ -136,15 +136,16 @@
 (defun emms-metaplaylist-mode-center-current ()
   "Center on the current playlist buffer"
   (interactive)
-  (when (not emms-playlist-buffer)
-    (error "no current playlist buffer"))
-  (goto-char (point-min))
-  (when (not
-	 (search-forward-regexp (regexp-quote
-				 (buffer-name emms-playlist-buffer))
-				(point-max) t))
-    (error "cannot not find the current playlist buffer"))
-  (goto-char (point-at-bol)))
+  (when (buffer-name emms-playlist-buffer)
+    (let ((p nil))
+      (save-excursion
+	(goto-char (point-min))
+	(setq p (search-forward-regexp (regexp-quote
+					(buffer-name emms-playlist-buffer))
+				       (point-max) t)))
+      (when (not p) (error "cannot not find the current playlist buffer"))
+      (goto-char p)
+      (goto-char (point-at-bol)))))
 
 (defun emms-metaplaylist-mode-create ()
   "Create the meta-playlist buffer."
@@ -226,7 +227,9 @@
     (switch-to-buffer mpm-buffer)))
 
 (defun emms-metaplaylist-mode ()
-  "A major mode for Emms playlists."
+  "A major mode for Emms playlists.
+
+\\{emms-metaplaylist-mode-map}"
   ;;  (interactive)
   (kill-all-local-variables)
 

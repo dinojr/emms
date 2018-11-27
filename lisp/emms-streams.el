@@ -147,7 +147,9 @@ needed info.")
     ("WFMU, Freeform radio"
      "http://www.wfmu.org/wfmu.pls" 1 streamlist)
     ("WBCR-LP - Berkshire Community Radio"
-     "http://nyc01.egihosting.com:6232/listen.pls" 1 streamlist)))
+     "http://nyc01.egihosting.com:6232/listen.pls" 1 streamlist)
+    ("Rinse FM - London and Worldwide"
+     "http://streamer.dgen.net:8000/rinseradio" 1 streamlist)))
 
 (defvar emms-stream-mode-map
   (let ((map (make-keymap)))
@@ -191,6 +193,9 @@ needed info.")
   (switch-to-buffer emms-stream-buffer-name))
 
 (defun emms-stream-mode ()
+  "Major mode for the EMMS Streams interface.
+
+\\{emms-stream-mode-map}"
   (kill-all-local-variables)
   (buffer-disable-undo)
   (setq major-mode 'emms-stream-mode)
